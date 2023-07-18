@@ -1,17 +1,27 @@
-import { Link, Outlet,useLoaderData,Form } from "react-router-dom";
+import { useSubmit,useNavigation,NavLink, Outlet,useLoaderData,Form, redirect } from "react-router-dom";
 import { getContacts,createContact } from "../contacts";
+import { useEffect } from "react";
 export async function action() {
     const contact = await createContact();
-    return { contact };
+    return redirect(`/contacts/${contact.id}/edit`)
   }
-export async function loader() {
-    const contacts = await getContacts();
-    return { contacts };
+export async function loader({request}) {
+  const url =new URL(request.url)
+  const q = url.searchParams.get("q");
+  const contacts = await getContacts(q)
+   // const contacts = await getContacts();
+    return { contacts,q };
   }
 export default function Root() {
-    const { contacts } = useLoaderData();
-
-    return (
+ 
+    const { contacts,q } = useLoaderData();
+    useEffect(() => {
+      document.getElementById("q").value = q;
+    },[q]);
+const navigation=useNavigation();
+const submit =useSubmit();
+ const  searching=navigation.location && new URLSearchParams(navigation.location.search).has('q')   
+ return (
       <>
         <div id="sidebar">
           <h1>React Router Contacts</h1>
@@ -19,15 +29,24 @@ export default function Root() {
             <Form id="search-form" role="search">
               <input
                 id="q"
+                className={searching ? "loading" : ""}
                 aria-label="Search contacts"
                 placeholder="Search"
                 type="search"
                 name="q"
+                defaultValue={q}
+                onChange={(event) => {
+                  const isFirstSearch = q == null;
+                submit(event.currentTarget.form, {
+                  replace: !isFirstSearch,
+                });
+                  
+                }}
               />
               <div
                 id="search-spinner"
                 aria-hidden
-                hidden={true}
+                hidden={!searching}
               />
               <div
                 className="sr-only"
@@ -43,7 +62,16 @@ export default function Root() {
             <ul>
               {contacts.map((contact) => (
                 <li key={contact.id}>
-                  <Link to={`contacts/${contact.id}`}>
+                  <NavLink
+                    to={`contacts/${contact.id}`}
+                    className={({ isActive, isPending }) =>
+                      isActive
+                        ? "active"
+                        : isPending
+                        ? "pending"
+                        : ""
+                    }
+                  >
                     {contact.first || contact.last ? (
                       <>
                         {contact.first} {contact.last}
@@ -52,7 +80,7 @@ export default function Root() {
                       <i>No Name</i>
                     )}{" "}
                     {contact.favorite && <span>★</span>}
-                  </Link>
+                  </NavLink>
                 </li>
               ))}
             </ul>
@@ -63,7 +91,11 @@ export default function Root() {
           )}
           </nav>
         </div>
-        <div id="detail">
+        <div id="detail"
+        className={
+          navigation.state === "loading" ? "loading" : ""
+        }
+        >
             <Outlet/>
         </div>
       </>
